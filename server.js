@@ -2,7 +2,8 @@ const mongoose = require("mongoose");
 const express = require("express");
 const bodyParser = require("body-parser");
 const logger = require("morgan");
-const Data = require("./articolo");
+const Articolo = require("./models/articolo");
+const Ordine = require ("./models/ordine");
 
 const API_PORT = 3001;
 const app = express();
@@ -33,10 +34,19 @@ app.use(logger("dev"));
 // this is our get method
 // this method fetches all available data in our database
 router.get("/getData", (req, res) => {
-  Data.find((err, data) => {
+  Articolo.find((err, data) => {
     if (err) return res.json({ success: false, error: err });
     return res.json({ success: true, data: data });
   });
+});
+router.get("/getOrdini", (req, res) => {
+    Ordine
+    .find()
+    .populate('articoli')
+    .exec(function(err, data) {
+        if (err) return res.json({ success: false, error: err });
+        res.json({ success: true, data: data });
+      });
 });
 
 // this is our update method
@@ -44,17 +54,18 @@ router.get("/getData", (req, res) => {
 router.post("/updateMagazzino", (req, res) => {
   const { id, update } = req.body;
   var query = { id: id };
-  Data.findOneAndUpdate(query, update, err => {
+  Articolo.findOneAndUpdate(query, update, err => {
     if (err) return res.json({ success: false, error: err });
     return res.json({ success: true });
   });
 });
 
+
 // this is our delete method
 // this method removes existing data in our database
 router.delete("/deleteMagazzino", (req, res) => {
   const { id } = req.body;
-  Data.findOneAndDelete(id, err => {
+  Articolo.findOneAndDelete(id, err => {
     if (err) return res.send(err);
     return res.json({ success: true });
   });
@@ -63,7 +74,7 @@ router.delete("/deleteMagazzino", (req, res) => {
 // this is our create methid
 // this method adds new data in our database
 router.post("/fillMagazino", (req, res) => {
-  let data = new Data();
+  let data = new Articolo();
 
   const { id, nome, disponibilita } = req.body;
   
@@ -75,6 +86,29 @@ router.post("/fillMagazino", (req, res) => {
     return res.json({ success: true });
   });
 });
+
+
+
+router.post("/createOrdine", (req, res)=>{
+    let ordine = new Ordine();
+    const {nome, indirizzo, prezzo, articoli} = req.body;
+    ordine.nome = nome;
+    ordine.indirizzo = indirizzo;
+    ordine.prezzo = prezzo;
+    ordine.articoli = articoli;
+    ordine.articoli.forEach(element => {
+        Articolo.findOneAndUpdate({"_id": element}, {$inc: {disponibilita: -1}}, err => {
+            if (err) return res.json({ success: false, error: err });
+            return  ordine.save(err => {
+                if (err) return res.json({ success: false, error: err });
+                
+                return res.json({ success: true });
+                
+              });
+          });
+    });
+   
+})
 
 // append /api for our http requests
 app.use("/api", router);
