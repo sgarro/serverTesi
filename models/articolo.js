@@ -6,7 +6,8 @@ const ArticoloSchema = new Schema(
   {
     id: Number ,
     nome: String,
-    disponibilita: Number
+    disponibilita: Number,
+    prezzo: Number
   },
   { timestamps: true }
 );

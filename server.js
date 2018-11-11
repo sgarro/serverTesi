@@ -4,6 +4,7 @@ const bodyParser = require("body-parser");
 const logger = require("morgan");
 const Articolo = require("./models/articolo");
 const Ordine = require ("./models/ordine");
+const Fattura = require ("./models/fattura");
 
 const API_PORT = 3001;
 const app = express();
@@ -41,6 +42,15 @@ router.get("/getData", (req, res) => {
 });
 router.get("/getOrdini", (req, res) => {
     Ordine
+    .find()
+    .populate('articoli')
+    .exec(function(err, data) {
+        if (err) return res.json({ success: false, error: err });
+        res.json({ success: true, data: data });
+      });
+});
+router.get("/getFatture", (req, res) => {
+    Fattura
     .find()
     .populate('articoli')
     .exec(function(err, data) {
@@ -109,6 +119,27 @@ router.post("/createOrdine", (req, res)=>{
     });
    
 })
+router.post("/createFattura", (req, res)=>{
+    let fattura = new Fattura();
+    const {id_ordine, articoli, prezzo} = req.body;
+    Ordine.findOne({"_id": id_ordine}, (err, data) => {
+      if (err) return res.send(err);
+      for(var i = 0; i < articoli.length; i++) {
+        if(data.articoli.indexOf(articoli[i])==-1) 
+          return res.json({ success: false, error: "articolo "+articoli[i]+ " non presente nell'ordine" });
+        }
+      fattura.idOrdine = id_ordine
+      fattura.nome = data.nome
+      fattura.indirizzo = data.indirizzo
+      fattura.prezzo = prezzo
+      fattura.articoli = articoli
+      fattura.save(err => {
+        if (err) return res.json({ success: false, error: err });
+        return res.json({ success: true });
+      });
+    });
+})
+
 
 // append /api for our http requests
 app.use("/api", router);
