@@ -62,9 +62,13 @@ router.get("/getFatture", (req, res) => {
 // this is our update method
 // this method overwrites existing data in our database
 router.post("/updateMagazzino", (req, res) => {
+  var opts = { runValidators: true };
+
   const { id, update } = req.body;
+  // let update = {$inc: {disponibilita: -1}}
+
   var query = { id: id };
-  Articolo.findOneAndUpdate(query, update, err => {
+  Articolo.findByIdAndUpdate(id, update, opts, err => {
     if (err) return res.json({ success: false, error: err });
     return res.json({ success: true });
   });
@@ -83,41 +87,59 @@ router.delete("/deleteMagazzino", (req, res) => {
 
 // this is our create methid
 // this method adds new data in our database
-router.post("/fillMagazino", (req, res) => {
+router.post("/fillMagazzino", (req, res) => {
   let data = new Articolo();
 
-  const { id, nome, disponibilita } = req.body;
+  const { id, nome, disponibilita, prezzo } = req.body;
   
   data.id = id;
   data.nome = nome;
   data.disponibilita = disponibilita;
+  data.prezzo = prezzo;
   data.save(err => {
     if (err) return res.json({ success: false, error: err });
     return res.json({ success: true });
   });
 });
 
-
-
-router.post("/createOrdine", (req, res)=>{
-    let ordine = new Ordine();
+async function createOrdine (req, res){
+  session = await mongoose.startSession();
+  session.startTransaction();
+  try {
     const {nome, indirizzo, prezzo, articoli} = req.body;
+    let ordine = new Ordine()
     ordine.nome = nome;
     ordine.indirizzo = indirizzo;
     ordine.prezzo = prezzo;
     ordine.articoli = articoli;
+    
     ordine.articoli.forEach(element => {
-        Articolo.findOneAndUpdate({"_id": element}, {$inc: {disponibilita: -1}}, err => {
-            if (err) return res.json({ success: false, error: err });
-            return  ordine.save(err => {
-                if (err) return res.json({ success: false, error: err });
-                
-                return res.json({ success: true });
-                
-              });
-          });
+    let query = {"_id": element}
+    let update = {$inc: {disponibilita: -1}}
+    const opts = { runValidators: true };
+    Articolo.findOneAndUpdate(query, update, opts, err => {
+          if (err) throw new Error(err);  
+        });
     });
-   
+    ordine.save(err => {
+      if (err) throw new Error(err);
+    });
+    await session.commitTransaction()
+    session.endSession();
+    return res.json({ success: true });
+  }catch (error) {
+    // If an error occurred, abort the whole transaction and
+    // undo any changes that might have happened
+    await session.abortTransaction();
+    session.endSession();
+    console.log(error)
+    return res.json({success: false, error: error})
+  }
+}
+
+router.post("/createOrdine", (req, res)=>{
+   createOrdine(req, res);
+    
 })
 router.post("/createFattura", (req, res)=>{
     let fattura = new Fattura();
