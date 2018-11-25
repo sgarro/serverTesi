@@ -90,12 +90,14 @@ router.delete("/deleteMagazzino", (req, res) => {
 router.post("/fillMagazzino", (req, res) => {
   let data = new Articolo();
 
-  const { id, nome, disponibilita, prezzo } = req.body;
+  const { id, nome, disponibilita, prezzo, marca, immagine } = req.body;
   
   data.id = id;
   data.nome = nome;
   data.disponibilita = disponibilita;
   data.prezzo = prezzo;
+  data.marca = marca;
+  data.immagine = immagine;
   data.save(err => {
     if (err) return res.json({ success: false, error: err });
     return res.json({ success: true });
@@ -116,7 +118,7 @@ async function createOrdine (req, res){
     ordine.articoli.forEach(element => {
     let query = {"_id": element}
     let update = {$inc: {disponibilita: -1}}
-    const opts = { runValidators: true };
+    const opts = { runValidators: true, session, new: true };
     Articolo.findOneAndUpdate(query, update, opts, err => {
           if (err) throw new Error(err);  
         });
@@ -124,9 +126,7 @@ async function createOrdine (req, res){
     ordine.save(err => {
       if (err) throw new Error(err);
     });
-    await session.commitTransaction()
-    session.endSession();
-    return res.json({ success: true });
+    
   }catch (error) {
     // If an error occurred, abort the whole transaction and
     // undo any changes that might have happened
@@ -135,17 +135,39 @@ async function createOrdine (req, res){
     console.log(error)
     return res.json({success: false, error: error})
   }
+  await session.commitTransaction()
+    session.endSession();
+    return res.json({ success: true });
 }
 
 router.post("/createOrdine", (req, res)=>{
-   createOrdine(req, res);
+  //  createOrdine(req, res);
+   const {articoli} = req.body;
+   try {
+    // Fails because then A would have a negative balance
+    transfer(articoli);
+  } catch (error) {
+    console.log(error); // "Insufficient funds: 1"
+  }
+
     
 })
 router.post("/createFattura", (req, res)=>{
     let fattura = new Fattura();
     const {id_ordine, articoli, prezzo} = req.body;
+    
+    if(!id_ordine) 
+      return res.json({success: false, error: 'Campo ordine mancante'});
+    if(!articoli) 
+      return res.json({success: false, error: 'Campo articoli mancante'});
+    if(!prezzo) 
+      return res.json({success: false, error: 'Campo prezzo mancante'});
+
     Ordine.findOne({"_id": id_ordine}, (err, data) => {
       if (err) return res.send(err);
+      if(data==null){
+        return res.json({success: false, error: 'Ordine non trovato'});
+      }
       for(var i = 0; i < articoli.length; i++) {
         if(data.articoli.indexOf(articoli[i])==-1) 
           return res.json({ success: false, error: "articolo "+articoli[i]+ " non presente nell'ordine" });
@@ -161,6 +183,29 @@ router.post("/createFattura", (req, res)=>{
       });
     });
 })
+
+
+async function transfer(articoli) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const opts = { session, new: true };
+    for(var i = 0; i < articoli.length; i++) {
+      let update = {$inc: {disponibilita: -1}}
+
+     const A = await Articolo.findOneAndUpdate({"_id": articoli[i]}, update, opts)
+    }
+    await session.commitTransaction();
+    session.endSession();
+  } catch (error) {
+    // If an error occurred, abort the whole transaction and
+    // undo any changes that might have happened
+    await session.abortTransaction();
+    session.endSession();
+    throw error; // Rethrow so calling function sees error
+  }
+}
+
 
 
 // append /api for our http requests

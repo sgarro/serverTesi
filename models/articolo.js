@@ -7,7 +7,9 @@ const ArticoloSchema = new Schema(
     id: Number ,
     nome: String,
     disponibilita: {type: Number, min: 0},
-    prezzo: Number
+    prezzo: Number,
+    marca: String,
+    immagine: String,
   },
   { timestamps: true }
 );
