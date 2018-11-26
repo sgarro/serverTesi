@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/sgarro/serverTesi#readme",
   "dependencies": {
+    "bcrypt": "^3.0.2",
     "body-parser": "^1.18.3",
     "expres": "0.0.5",
     "express": "^4.16.4",
